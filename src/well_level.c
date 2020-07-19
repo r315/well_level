@@ -48,7 +48,12 @@ static float capacity;
 static int32_t distance;
 
 /**
+ * @brief Configure a sw timer for continuasly call a function.
  * 
+ * \param func : pointer to the function to be called when timer expires
+ * \param param : pointer to function parameters
+ * \param interval : function calling interval in ms
+ * \return : timer index on success, MAX_TIMERS if no timer is available
  * */
 uint32_t setTimer(void(*func)(void*), void *param, uint32_t interval){
 timer_t *pt = timers;
@@ -69,10 +74,20 @@ void stopTimer(uint32_t tim){
     timers[tim].func = NULL;
 }
 
+/**
+ * @brief Callback from USART interrupt that 
+ * indicate if a frame was properly received.
+ * */
 void sensorResponse(void){
     jsn_rdy = JSN_Checksum(&jsn_frame);
 }
 
+/**
+ * @brief Callback from sw timer every second to read sensor
+ * 
+ * \param ptr : pointer to extra parameters, not used
+ *
+ * */
 void querySensor(void *prt){
     uint8_t data = JSN_START_RANGING;
     int32_t diff, level;
@@ -109,6 +124,11 @@ void querySensor(void *prt){
     BOARD_UsartTransmit(&data, 1);
 }
 
+/**
+ * @brief Loop through all timers checking if expired and call
+ * the correspondent function. This should be called from main 
+ * loop or OS task.
+ * */
 void processTimers(void){
 uint32_t now = getTicks();
 timer_t *pt = timers;
@@ -123,7 +143,14 @@ timer_t *pt = timers;
     }
 }
 
-void update(void *p){
+/**
+ * @brief Callback from sw timer for creating a animated
+ * demo
+ * 
+ * \param ptr : pointer to extra parameters, not used
+ *
+ * */
+void demo(void *ptr){
 uint8_t level = 0;
 
 int32_t diff = MAX_HIGHT - (distance - SENSOR_OFFSET);
@@ -141,6 +168,9 @@ int32_t diff = MAX_HIGHT - (distance - SENSOR_OFFSET);
     }
 }
 
+/**
+ * @brief Main entry point
+ * */
 int main(void){
 
     LCD_Init();      
@@ -168,7 +198,7 @@ int main(void){
 
     distance = MAX_HIGHT;
 
-    //setTimer(update, NULL, 500);
+    //setTimer(demo, NULL, 500);
 
     while(1){
         processTimers();
