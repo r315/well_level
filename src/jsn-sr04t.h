@@ -15,6 +15,10 @@
 
 #define JSN_SERIAL_SPEED        9600
 
+#define JSN_MODE1               1
+#define JSN_MODE2               2
+#define JSN_MODE3               3
+
 typedef struct{
     uint8_t header;
     uint8_t h_data;
@@ -24,5 +28,7 @@ typedef struct{
 
 uint8_t JSN_Checksum(jsnframe_t *frame);
 uint16_t JSN_Distance(jsnframe_t *frame);
+
+void JSN_Trigger();
 
 #endif /* SRC_JSN_SR04T_H_ */

@@ -14,6 +14,9 @@ $(BSP_SRC_DIR)/startup_stm32f030f4px.s \
 SYMBOLS = \
 -DSTM32F030x6 \
 -DDEBUG \
+-DJSN_MODE=JSN_MODE1 \
+
+DEVICE =STM32F030F4
 
 OPTIMIZATION =-O0 -g3
 CPU =-mcpu=cortex-m0 -mfloat-abi=soft -mthumb
@@ -21,7 +24,7 @@ STD =-std=gnu11
 OPTIONS =-ffunction-sections -fdata-sections -Wall #-fstack-usage
 SPECS =--specs=nano.specs
 
-CFLAGS =$(CPU) $(OPTIMIZATION) $(SPECS)
+CFLAGS =$(CPU) $(OPTIMIZATION) $(SPECS) $(SYMBOLS)
 DEPS =-MMD -MP -MF"$<" -MT"$@"
 
 LD_SCRIPT =$(BSP_SRC_DIR)/STM32F030F4PX_FLASH.ld
@@ -32,6 +35,13 @@ CPP =$(PREFIX)gcc
 AS =$(PREFIX)gcc
 LD =$(PREFIX)gcc
 SIZE =$(PREFIX)size
+OBJCOPY =$(PREFIX)objcopy
+
+ifeq ($(shell uname -s), Linux)
+JLINK ="/opt/SEGGER/JLink/JLinkExe"
+else
+JLINK ="C:\Tools\JLink_V500\jlink"
+endif
 
 OBJECTS =$(addprefix $(BUILD_DIR)/, $(notdir $(CSRCS:.c=.o))) $(addprefix $(BUILD_DIR)/, $(notdir $(ASRCS:.s=.o)))
 INCLUDES =$(addprefix -I, $(dir $(CSRCS)))
@@ -54,8 +64,19 @@ $(TARGET).cfg:
 	echo "source [find target/stm32f0x.cfg]" >> $@
 	echo "adapter_khz 4000" >> $@
 
-program: $(TARGET).elf $(TARGET).cfg
+program-openocd: $(TARGET).elf $(TARGET).cfg
 	openocd -f $(TARGET).cfg -c "program $(TARGET).elf verify reset exit"
+
+$(TARGET).jlink: $(TARGET).hex
+	@echo "Creating Jlink configuration file"
+	@echo "loadfile $<" > $@
+	@echo "r" >> $@
+	@echo "q" >> $@
+#@echo "erase" > $@
+
+program-jlink: $(TARGET).jlink 
+	$(JLINK) -device $(DEVICE) -if SWD -speed auto -CommanderScript $<
+
 test:
 	@echo ""; $(foreach d, $(dir $(VPATH)) , echo $(d);)
 
@@ -65,6 +86,9 @@ $(BUILD_DIR):
 $(TARGET).elf : $(OBJECTS)
 	$(LD) -o $@ $(OBJECTS) $(CPU) -T"$(LD_SCRIPT)" $(SPECS) --specs=nosys.specs -static -Wl,-Map="$(TARGET).map" -Wl,--gc-sections -nostdlib
 #-Wl,--start-group -lc -lm -lstdc++ -lsupc++ -Wl,--end-group
+
+$(TARGET).hex : $(TARGET).elf
+	$(OBJCOPY) -O ihex $< $@
 
 $(BUILD_DIR)/%.o: %.c | $(BUILD_DIR)
 	$(GCC) $(CFLAGS) $(INCLUDES) $(OPTIONS) -c "$<" -o "$@"

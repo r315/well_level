@@ -3,9 +3,9 @@
 #include "board.h"
 #include "jsn-sr04t.h"
 #include "graphics.h"
+#include "timer.h"
 
 #define QUERY_INTERVAL  1000
-#define MAX_TIMERS      4
 
 #define true 	1
 #define false	0
@@ -32,53 +32,23 @@
 #define RADIUS          (DIAMETER / 2)
 #define PI              (3.1415)
 
-typedef struct {
-	uint32_t interval;
-    uint32_t start;
-	void (*func)(void*);
-	void *param;
-}timer_t;
-
-timer_t timers[MAX_TIMERS];
+#define CAPACITY        (PI*RADIUS*RADIUS*HIGHT * 1000) // cubic meters * 1000L
 
 volatile uint8_t jsn_rdy;
 static jsnframe_t jsn_frame;
 static uint8_t jsn_error;
-static float capacity;
-static int32_t distance;
 
-/**
- * @brief Configure a sw timer for continuasly call a function.
- * 
- * \param func : pointer to the function to be called when timer expires
- * \param param : pointer to function parameters
- * \param interval : function calling interval in ms
- * \return : timer index on success, MAX_TIMERS if no timer is available
- * */
-uint32_t setTimer(void(*func)(void*), void *param, uint32_t interval){
-timer_t *pt = timers;
-    for(uint32_t i = 0; i < MAX_TIMERS; i++, pt++){
-        if(pt->interval == 0){
-            pt->func = func;
-            pt->param = param;
-            pt->start = getTicks();
-            pt->interval = interval;
-            return i;
-        }
-    }
-    return MAX_TIMERS;
+#if JSN_MODE == JSN_MODE1
+static void triggerSensor(void *ptr){
+    JSN_Trigger();
 }
 
-void stopTimer(uint32_t tim){
-    timers[tim].interval = 0;
-    timers[tim].func = NULL;
-}
-
+#elif JSN_MODE == JSN_MODE3
 /**
  * @brief Callback from USART interrupt that 
  * indicate if a frame was properly received.
  * */
-void sensorResponse(void){
+static void sensorResponse(void){
     jsn_rdy = JSN_Checksum(&jsn_frame);
 }
 
@@ -88,16 +58,22 @@ void sensorResponse(void){
  * \param ptr : pointer to extra parameters, not used
  *
  * */
-void querySensor(void *prt){
-    uint8_t data = JSN_START_RANGING;
+static void querySensor(void *prt){    
     int32_t diff, level;
+    uint16_t raw_measure;
+    int32_t distance;
 
     LED_TOGGLE;
     if(jsn_rdy){
         // print data
         jsn_rdy = false;
-        distance = JSN_Distance(&jsn_frame) - SENSOR_OFFSET;   
+        raw_measure = JSN_Distance(&jsn_frame);
+
+        #if 1
+        TEXT_PrintInt(50, 7, raw_measure, 4);
+        #endif
        
+        distance =  raw_measure - SENSOR_OFFSET;
         diff = MAX_HIGHT - distance ;
 
         // Only positive differences are valid
@@ -105,9 +81,9 @@ void querySensor(void *prt){
             level = diff * 100 / MAX_HIGHT;
 
             printPercent(level);
-            printAvalilable((capacity * level) / 100);
+            printAvalilable((CAPACITY * level) / 100);
             drawLevel(level);
-            printDistance(diff);
+            printDistance(diff);           
         }
 
         if(jsn_error == true){
@@ -120,29 +96,12 @@ void querySensor(void *prt){
             printAlert(true);
         }
     }
-    BOARD_UsartReceiveDMA((uint8_t*)&jsn_frame, JSN_FRAME_SIZE, sensorResponse);
-    BOARD_UsartTransmit(&data, 1);
+    // Prepare receive
+    BOARD_UartReceiveDMA((uint8_t*)&jsn_frame, JSN_FRAME_SIZE, sensorResponse);
+    // Trigger sensor
+    JSN_Trigger();
 }
-
-/**
- * @brief Loop through all timers checking if expired and call
- * the correspondent function. This should be called from main 
- * loop or OS task.
- * */
-void processTimers(void){
-uint32_t now = getTicks();
-timer_t *pt = timers;
-    for(uint32_t i = 0; i < MAX_TIMERS; i++, pt++){
-        if(pt->interval > 0){
-            uint32_t diff = now - pt->start;
-            if(diff >= pt->interval){
-                pt->func(pt->param);
-                pt->start = now;
-            }
-        }
-    }
-}
-
+#else
 /**
  * @brief Callback from sw timer for creating a animated
  * demo
@@ -150,15 +109,16 @@ timer_t *pt = timers;
  * \param ptr : pointer to extra parameters, not used
  *
  * */
-void demo(void *ptr){
-uint8_t level = 0;
+static void demo(void *ptr){
+    uint8_t level;
+    static int32_t distance = MAX_HIGHT;
 
-int32_t diff = MAX_HIGHT - (distance - SENSOR_OFFSET);
+    int32_t diff = MAX_HIGHT - (distance - SENSOR_OFFSET);
 
     level = diff * 100 / MAX_HIGHT;
 
     printPercent(level);
-    printAvalilable((capacity * level) / 100);
+    printAvalilable((CAPACITY * level) / 100);
     drawLevel(level);
     printDistance(diff);
 
@@ -167,41 +127,42 @@ int32_t diff = MAX_HIGHT - (distance - SENSOR_OFFSET);
         distance = MAX_HIGHT;
     }
 }
-
+#endif
 /**
  * @brief Main entry point
  * */
 int main(void){
 
+    BOARD_Init();
+#if JSN_MODE == JSN_MODE1    
+    TIMER_Interval(triggerSensor, NULL, 50);
+#else 
+    
     LCD_Init();      
 
-    serialInit(JSN_SERIAL_SPEED);
-
-    setTimer(querySensor, NULL, QUERY_INTERVAL);
-    BOARD_UsartReceiveDMA((uint8_t*)&jsn_frame, JSN_FRAME_SIZE, sensorResponse);
+#if JSN_MODE == JSN_MODE3
+    TIMER_Interval(querySensor, NULL, QUERY_INTERVAL);
+#else
+    TIMER_Interval(demo, NULL, 500);
+#endif
     
-    xmemset(fbuf, 0x0, 8*128);
+    initGraphics();
    
     drawHline(50, 18, 128 - 50);
     drawHline(50, 42, 128 - 50);
     drawVline(48, 0, 64);    
     drawBitmap(TANK_POS,(uint8_t*)tank, TANK_W, TANK_H);
     
-    capacity = PI*RADIUS*RADIUS*HIGHT;  // cubic meters
-    capacity = capacity * 1000;         // Liters
-
-    printCapacity(capacity);
-
     TEXT_Print(LINE1_TEXT_POS, "Disp.:");
     TEXT_Print(LINE4_TEXT_POS, "Altura:");
     TEXT_Print(LINE5_TEXT_POS, "Total:");
 
-    distance = MAX_HIGHT;
-
-    //setTimer(demo, NULL, 500);
+    printCapacity(CAPACITY);
+#endif
 
     while(1){
-        processTimers();
+        TIMER_Process();
     }
+
 	return 0;
 }
