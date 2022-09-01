@@ -9,6 +9,10 @@
 #include "text.h"
 #include "board.h"
 
+#define HIT_FONT_W 10
+#define HIT_FONT_H 2
+#define HITACHI_FONT_LINE_BYTES HIT_FONT_W * HIT_FONT_H
+
 const uint8_t HITACHI_FONT[] = {
 
     0xFC, 0xFC, 0x03, 0x03, 0xC3, 0xC3, 0x33, 0x33, 0xFC, 0xFC, 0x0F, 0x0F, 0x33, 0x33, 0x30, 0x30, 0x30, 0x30, 0x0F, 0x0F, // 48
@@ -121,16 +125,12 @@ const uint8_t default_font[]={
      0x44, 0x64, 0x54, 0x4C, 0x44 ,   // z
 };
 
-static void drawChar(uint8_t c){
-	const uint8_t *f_data = default_font + (c - ' ') * FONT_W;
+uint8_t TEXT_PrintChar(uint8_t x, uint8_t y, uint8_t c){
+    const uint8_t *f_data = default_font + (c - ' ') * FONT_W;
+	LCD_setPos(x,y);
 	for(uint8_t i = 0; i < FONT_W; i++, f_data++){
 		LCD_Data(*f_data);
 	}
-}
-
-uint8_t TEXT_PrintChar(uint8_t x, uint8_t y, uint8_t c){
-	LCD_setPos(x,y);
-	drawChar(c);
 	return x + FONT_W + FONT_SPACING;
 }
 

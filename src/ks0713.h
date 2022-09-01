@@ -24,9 +24,9 @@
  * 6 RS
  * 7 RW_WR   - GND
  * 8 E_RD    - GND
- * 9-14 DB0-DB5 
- * 15 DB6 <- SCL
- * 16 DB7 <- SDA
+ * 9-14 DB0:5 
+ * 15 DB6    <- SCL
+ * 16 DB7    <- SDA
  * 17 led+
  * 18 led-
  *******************************************/
@@ -74,7 +74,20 @@
 #define BUF_INC_PAGE    LCD_W
 
 void LCD_Init(void);
+
+/**
+ * @brief Set page and column address for write
+ * 
+ * @param x     Column address 255-0
+ * @param y     Page address    15-0
+ */
 void LCD_setPos(uint8_t x, uint8_t y);
+
+/**
+ * @brief Write byte to current page and column address
+ * 
+ * @param d 
+ */
 void LCD_Data(uint8_t d);
 
 /**

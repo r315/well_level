@@ -10,15 +10,21 @@
 
 #include <stdint.h>
 
-#define HIT_FONT_W 10
-#define HIT_FONT_H 2
-#define HITACHI_FONT_LINE_BYTES HIT_FONT_W * HIT_FONT_H
-
-extern const uint8_t default_font[];
-
 uint8_t TEXT_PrintChar(uint8_t x, uint8_t y, uint8_t c);
-uint8_t TEXT_PrintInt(uint8_t x, uint8_t y, int32_t value, int8_t ndig);
 uint8_t TEXT_Print(uint8_t x, uint8_t y, char *text);
+/**
+ * @brief Prints signed integer on display
+ * 
+ * @param x         X position 127-0
+ * @param y         Y Line 7-0
+ * @param value     Integer value
+ * @param ndig      padding 
+ *                  0: No padding
+ *                  < 0: Right justified pad with n '0'
+ *                  > 0: Right justified pad with n ' '
+ * @return uint8_t 
+ */
+uint8_t TEXT_PrintInt(uint8_t x, uint8_t y, int32_t value, int8_t ndig);
 
 #endif
 

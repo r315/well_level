@@ -30,13 +30,13 @@ const uint8_t _f[] = {
     0xff,0xe0,0x80,0x20,0x9f,0x20,0x90,0x20,0x90,0x20,0x9c,0x20,0x90,0x20,0x90,0x20,0x90,0x20,0x80,0x20,0xff,0xe0
 };
 
-uint8_t fbuf[LCD_W * LCD_H/8];
+static uint8_t s_fb[LCD_W * LCD_H/8];
 
-void xmemset(void *dst, uint8_t value, uint32_t count){
-    uint8_t *p = (uint8_t*)dst;
-    do{
-        *p++ = value;
-    }while(--count);
+void initGraphics(void){
+    // Clear frame buffer
+    for (uint32_t i = 0; i < sizeof(s_fb); i++){
+        s_fb[i] = 0;
+    }
 }
 
 /**
@@ -47,14 +47,14 @@ void xmemset(void *dst, uint8_t value, uint32_t count){
  * @param color : 0 off, 1 on
  * */
 static void writePixel(uint16_t x, uint16_t y, uint8_t *buf, uint8_t color){
-    uint8_t tmp = buf[x + (y >> 3) * LCD_W] & ~(1 << (y & 7));
+        uint8_t tmp = buf[x + (y >> 3) * LCD_W] & ~(1 << (y & 7));
         buf[x + (y >> 3) * LCD_W] = tmp | (color << (y & 7));
 }
 
 static void fillSolid( uint8_t x, uint8_t y, uint8_t *buf, uint8_t w, uint8_t h, uint8_t color){
     for(uint8_t i = y; i < y + h; i++){
         for(uint8_t j = x; j < x + w; j++){
-            writePixel(j, i, fbuf, color);
+            writePixel(j, i, s_fb, color);
         }
     }
 }
@@ -89,29 +89,29 @@ uint8_t data, color;
 }
 
 void drawBitmap(uint16_t x, uint16_t y, uint8_t *bitmap, uint8_t w, uint8_t h){
-    copy2FrameBuf(x, y, fbuf, bitmap, w, h);
-    LCD_PartialFrameBuffer(x, y, fbuf, w, h);
+    copy2FrameBuf(x, y, s_fb, bitmap, w, h);
+    LCD_PartialFrameBuffer(x, y, s_fb, w, h);
 }
 
 void drawHline(uint8_t x, uint8_t y, uint8_t size){
     for(uint8_t i = x; i < x + size; i++){
-        writePixel(i, y, fbuf, 1);
+        writePixel(i, y, s_fb, 1);
     }
-    LCD_PartialFrameBuffer(x, y, fbuf, size, 1);
+    LCD_PartialFrameBuffer(x, y, s_fb, size, 1);
 }
 
 void drawVline(uint8_t x, uint8_t y, uint8_t size){
     for(uint8_t i = y; i < y + size; i++){
-        writePixel(x, i, fbuf, 1);
+        writePixel(x, i, s_fb, 1);
     }
-    LCD_PartialFrameBuffer(x, y, fbuf, 1, size);
+    LCD_PartialFrameBuffer(x, y, s_fb, 1, size);
 }
 
 void printAlert(uint8_t visible){
     if(visible){
-        drawBitmap(ALERT_POS, alert, 11, 11);
+        drawBitmap(ALERT_POS, (uint8_t*)alert, 11, 11);
     }else{
-        drawBitmap(ALERT_POS, alert + (2 * 11), 11, 11);
+        drawBitmap(ALERT_POS, (uint8_t*)alert + (2 * 11), 11, 11);
     }
 }
 
@@ -132,9 +132,9 @@ uint16_t tmp = distance /1000;
 void drawLevel(uint8_t level){
 uint8_t dec;
     dec = level / 10;
-    fillSolid(2, TANK_TOP, fbuf, 41, 40 - dec * 4, 0);
-    fillSolid(2, TANK_TOP + 40 - dec * 4, fbuf, 41, dec * 4, 1);
-    LCD_PartialFrameBuffer(2,TANK_TOP, fbuf, 41, 40);
+    fillSolid(2, TANK_TOP, s_fb, 41, 40 - dec * 4, 0);
+    fillSolid(2, TANK_TOP + 40 - dec * 4, s_fb, 41, dec * 4, 1);
+    LCD_PartialFrameBuffer(2,TANK_TOP, s_fb, 41, 40);
 }
 
 void printPercent(uint8_t level){

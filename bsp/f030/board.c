@@ -55,22 +55,21 @@ void SystemInit(void)
 
 	while((RCC->CFGR & (3 << 2)) != (2 << 2));
 	SystemCoreClock = 48000000UL;
-	BOARD_Init();
 }
 
 /**
  *  PA9     ------> USART1_TX (AF1)
  *  PA10    ------> USART1_RX (AF1)
  * */
-void BOARD_UsartInit(uint32_t speed){
+void BOARD_UartInit(uint32_t speed){
 	RCC->APB2ENR |= RCC_APB2ENR_USART1EN;
 	RCC->AHBENR |= RCC_AHBENR_DMAEN;
 
 	RCC->APB2RSTR |= RCC_APB2RSTR_USART1RST;
 	RCC->APB2RSTR &= ~RCC_APB2RSTR_USART1RST;
 
-	BOARD_gpioInit(GPIOA, 9, GPIO_AF1);
-	BOARD_gpioInit(GPIOA, 10, GPIO_AF1);
+	BOARD_GpioInit(GPIOA, 9, GPIO_AF1);
+	BOARD_GpioInit(GPIOA, 10, GPIO_AF1);
 
 	USART1->CR1 = USART_CR1_RXNEIE | USART_CR1_RE | USART_CR1_TE;
 
@@ -90,13 +89,20 @@ void BOARD_Init(void){
 	
 	LED_INIT;
 
-	BOARD_gpioInit(LCD_CK_Port, LCD_CK_Pin, GPO_LS);
-	BOARD_gpioInit(LCD_DI_Port, LCD_DI_Pin, GPO_LS);
-	BOARD_gpioInit(LCD_RS_Port, LCD_RS_Pin, GPO_LS);
-	BOARD_gpioInit(LCD_RST_Port, LCD_RST_Pin, GPO_LS);	
+	BOARD_GpioInit(LCD_CK_Port, LCD_CK_Pin, GPO_LS);
+	BOARD_GpioInit(LCD_DI_Port, LCD_DI_Pin, GPO_LS);
+	BOARD_GpioInit(LCD_RS_Port, LCD_RS_Pin, GPO_LS);
+	BOARD_GpioInit(LCD_RST_Port, LCD_RST_Pin, GPO_LS);
+
+	#if JSN_MODE == JSN_MODE1
+	BOARD_GpioInit(BOARD_JSN_TRI_PORT, BOARD_JSN_TRI_PIN, GPO_LS);
+    BOARD_GpioInit(BOARD_JSN_ECHO_PORT, BOARD_JSN_ECHO_PIN, GPI);
+	#else
+	BOARD_UartInit(JSN_SERIAL_SPEED);
+	#endif	
 }
 
-void BOARD_gpioInit(GPIO_TypeDef *port, uint8_t pin, uint16_t mode) {
+void BOARD_GpioInit(GPIO_TypeDef *port, uint8_t pin, uint16_t mode) {
 
 uint16_t tmp = mode & 3;
 
@@ -122,6 +128,16 @@ uint16_t tmp = mode & 3;
 	port->OTYPER = (port->OTYPER & ~(1 << pin)) | (tmp << pin);
 }
 
+void BOARD_GpioWrite(GPIO_TypeDef *port, uint8_t pin, uint16_t state) {
+	pin &= 15;
+	
+	if(state){
+		port->BSRR = (0x00001 << pin);
+	}else{
+		port->BSRR = (0x10000 << pin);
+	}
+}
+
 uint32_t BOARD_GetTicks(void){
 	return ticks;
 }
@@ -131,12 +147,12 @@ uint32_t expire = ticks + ms;
 	while(ticks < expire);	
 }
 
-void BOARD_UsartTransmit(uint8_t *data, uint16_t count){
+void BOARD_UartTransmit(uint8_t *data, uint16_t count){
 	while(!(USART1->ISR & USART_ISR_TXE));
 	USART1->TDR = *data;
 }
 
-void BOARD_UsartReceiveDMA(uint8_t *data, uint16_t count, void(*eor)(void)){
+void BOARD_UartReceiveDMA(uint8_t *data, uint16_t count, void(*eor)(void)){
 	DMA1_Channel3->CCR = 
 			//DMA_CCR_PL |        // Highest priority
             (0 << 10) |         // Memory size 8bit

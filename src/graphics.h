@@ -30,8 +30,6 @@ extern const uint8_t tank[];
 extern const uint8_t alert[];
 extern uint8_t fbuf[];
 
-void xmemset(void *dst, uint8_t value, uint32_t count);
-
 /**
  * @param x : X coodinate
  * @param y : Y coodinate
@@ -81,5 +79,7 @@ void printAvalilable(uint32_t avail);
  * @param cap : Total capacity in liters
  * */
 void printCapacity(uint32_t cap);
+
+void initGraphics(void);
 
 #endif

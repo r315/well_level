@@ -7,6 +7,16 @@
 #include "ks0713.h"
 #include "text.h"
 
+/**
+ * @brief Pin connections
+ * 
+ * 
+ *   MCU    Sensor
+ *   PA9 -> RX/Trig
+ *  PA10 <- TX/Echo
+ * 
+ */
+
 
 /** ------------------- GPIO definitions -------------------------------
  * |31 - 11 | 10 - 7 | 6  | 5 - 4 | 3 - 2 | 1 - 0 |
@@ -46,7 +56,7 @@
 
 #define LED_PIN             4
 #define LED_PORT            GPIOA
-#define LED_INIT            BOARD_gpioInit(LED_PORT, LED_PIN, GPO_LS)
+#define LED_INIT            BOARD_GpioInit(LED_PORT, LED_PIN, GPO_LS)
 #define LED_TOGGLE          LED_PORT->ODR ^= (1 << LED_PIN)
 
 #define LCD_CK_Pin          5
@@ -71,18 +81,25 @@
 
 #define PERIODIC_TIMER      TIM3
 
+#define BOARD_JSN_TRI_PORT  GPIOA
+#define BOARD_JSN_TRI_PIN   9
+
+#define BOARD_JSN_ECHO_PORT  GPIOA
+#define BOARD_JSN_ECHO_PIN   10
+
 extern uint32_t SystemCoreClock;
 
-void BOARD_gpioInit(GPIO_TypeDef *port, uint8_t pin, uint16_t mode);
+void BOARD_GpioInit(GPIO_TypeDef *port, uint8_t pin, uint16_t mode);
+void BOARD_GpioWrite(GPIO_TypeDef *port, uint8_t pin, uint16_t state);
 void BOARD_Init(void);
 void BOARD_DelayMs(uint32_t ms);
 uint32_t BOARD_GetTicks(void);
-void BOARD_UsartInit(uint32_t speed);
-void BOARD_UsartTransmit(uint8_t *data, uint16_t count);
-void BOARD_UsartReceiveDMA(uint8_t *data, uint16_t count, void(*eor)(void));
+void BOARD_UartInit(uint32_t speed);
+void BOARD_UartTransmit(uint8_t *data, uint16_t count);
+void BOARD_UartReceiveDMA(uint8_t *data, uint16_t count, void(*eor)(void));
 
 #define DelayMs             BOARD_DelayMs
 #define getTicks            BOARD_GetTicks
-#define serialInit          BOARD_UsartInit
+#define serialInit          BOARD_UartInit
 
 #endif

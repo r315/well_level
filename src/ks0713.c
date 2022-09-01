@@ -13,7 +13,7 @@
 #include "ks0713.h"
 
 
-void shiftout(uint8_t bits)
+static void shiftout(uint8_t bits)
 {
 #if !defined(LCD_BIT_BANG)
 	SPI(bits);
@@ -41,7 +41,7 @@ void shiftout(uint8_t bits)
 //-----------------------------------------------
 // 
 //-----------------------------------------------
-void lcdcmd(uint8_t c)
+static void lcdcmd(uint8_t c)
 {
 	LCDRS0;
 	shiftout(c);
@@ -59,9 +59,9 @@ void LCD_Data(uint8_t d)
 //-----------------------------------------------
 void LCD_setPos(uint8_t x, uint8_t y)
 {
-	lcdcmd(0x10 | (x>>4));
-	lcdcmd(x&0x0f);
-	lcdcmd(0xB0 + y);
+	lcdcmd(KS0713_CASET | (x>>4));
+	lcdcmd(x & 0x0f);
+	lcdcmd(KS0713_PASET + y);
 }
 //-----------------------------------------------
 //
