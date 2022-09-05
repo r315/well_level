@@ -24,32 +24,33 @@
  * */
 
 /* Well dimensions and sensor location */
-#define DIAMETER        1.5f          // meters
-#define HIGHT           2.5f          // meters
-#define MAX_HIGHT       466           // distance from bottom to max level in mm
-#define SENSOR_OFFSET   206           // distance from max level to sensor in mm
+#define TANK_DIAMETER       1500          // mm
+#define TANK_HIGHT          2500          // mm
+#define TANK_RADIUS         (TANK_DIAMETER / 2)
+#define TANK_CAPACITY       ((PI * TANK_RADIUS * TANK_RADIUS * TANK_HIGHT) / 1000000UL) // cubic mm * 1000L
 
-#define RADIUS          (DIAMETER / 2)
-#define PI              (3.1415)
+#define SENSOR_OFFSET       210                     // distance from max level to sensor in mm
+#define SENSOR_MAX_DISTANCE (SENSOR_OFFSET + TANK_HIGHT)  // distance from bottom to max level in mm
 
-#define CAPACITY        (PI*RADIUS*RADIUS*HIGHT * 1000) // cubic meters * 1000L
+#define PI                  (3.1415)
 
 volatile uint8_t jsn_rdy;
 static jsnframe_t jsn_frame;
-static uint8_t jsn_error;
 
-#if JSN_MODE == JSN_MODE1
-static void triggerSensor(void *ptr){
-    JSN_Trigger();
-}
-
-#elif JSN_MODE == JSN_MODE3
+#if JSN_MODE
 /**
  * @brief Callback from USART interrupt that 
  * indicate if a frame was properly received.
  * */
-static void sensorResponse(void){
+static void sensorResponse(uint32_t time){
+    #if JSN_MODE == JSN_MODE1
+    jsn_frame.h_data = (time >> 8) & 255;
+    jsn_frame.l_data = time & 255;
+    jsn_rdy = true;
+    #elif JSN_MODE == JSN_MODE3
     jsn_rdy = JSN_Checksum(&jsn_frame);
+    #endif
+    LED_ON;
 }
 
 /**
@@ -58,48 +59,51 @@ static void sensorResponse(void){
  * \param ptr : pointer to extra parameters, not used
  *
  * */
-static void querySensor(void *prt){    
-    int32_t diff, level;
-    uint16_t raw_measure;
-    int32_t distance;
+static void querySensor(void *prt){
+    uint8_t level, jsn_error = true;
+    int32_t diff;
+    int32_t raw_measure;
 
-    LED_TOGGLE;
     if(jsn_rdy){
-        // print data
-        jsn_rdy = false;
+        jsn_rdy = false;        
+       
         raw_measure = JSN_Distance(&jsn_frame);
 
-        #if 1
-        TEXT_PrintInt(50, 7, raw_measure, 4);
+        #if DEBUG
+        printSensor(raw_measure);
         #endif
-       
-        distance =  raw_measure - SENSOR_OFFSET;
-        diff = MAX_HIGHT - distance ;
 
-        // Only positive differences are valid
-        if(diff >= 0){
-            level = diff * 100 / MAX_HIGHT;
+        if(raw_measure > JSN_MIN_DIST && raw_measure < JSN_MAX_DIST){
+            raw_measure -= SENSOR_OFFSET;
+            diff = TANK_HIGHT - raw_measure;
 
-            printPercent(level);
-            printAvalilable((CAPACITY * level) / 100);
+            printDistance(diff);
+
+            // If negative the most probable is that level is above TANK_HIGHT
+            if(diff < 0){
+                diff = TANK_HIGHT;
+            }
+            
+            level = (diff * 100) / TANK_HIGHT;
+
+            printAvalilable(TANK_CAPACITY, level);
             drawLevel(level);
-            printDistance(diff);           
-        }
 
-        if(jsn_error == true){
             jsn_error = false;
-            printAlert(false);
-        }
-    }else{
-        if(jsn_error == false){
-            jsn_error = true;
-            printAlert(true);
-        }
+	    }
     }
+
+    printAlert(jsn_error);
+
+    #if JSN_MODE == JSN_MODE1
+    BOARD_MeasurePulse(GPIO_HIGH, sensorResponse);
+    #elif JSN_MODE == JSN_MODE3
     // Prepare receive
     BOARD_UartReceiveDMA((uint8_t*)&jsn_frame, JSN_FRAME_SIZE, sensorResponse);
+    #endif
     // Trigger sensor
     JSN_Trigger();
+    LED_OFF;
 }
 #else
 /**
@@ -111,21 +115,20 @@ static void querySensor(void *prt){
  * */
 static void demo(void *ptr){
     uint8_t level;
-    static int32_t distance = MAX_HIGHT;
+    static uint16_t raw_measure = SENSOR_MAX_DISTANCE + SENSOR_OFFSET;
 
-    int32_t diff = MAX_HIGHT - (distance - SENSOR_OFFSET);
+    raw_measure -= 50;
+    if(raw_measure < SENSOR_OFFSET){
+        raw_measure = SENSOR_MAX_DISTANCE + SENSOR_OFFSET;
+    }
 
-    level = diff * 100 / MAX_HIGHT;
+    int32_t diff = SENSOR_MAX_DISTANCE - (raw_measure - SENSOR_OFFSET);
 
-    printPercent(level);
-    printAvalilable((CAPACITY * level) / 100);
+    level = (diff * 100) / SENSOR_MAX_DISTANCE;
+
+    printAvalilable(TANK_CAPACITY, level);
     drawLevel(level);
     printDistance(diff);
-
-    distance -= 50;
-    if(distance < 0){
-        distance = MAX_HIGHT;
-    }
 }
 #endif
 /**
@@ -134,30 +137,16 @@ static void demo(void *ptr){
 int main(void){
 
     BOARD_Init();
-#if JSN_MODE == JSN_MODE1    
-    TIMER_Interval(triggerSensor, NULL, 50);
-#else 
     
     LCD_Init();      
 
-#if JSN_MODE == JSN_MODE3
+    initGraphics();
+    printCapacity(TANK_CAPACITY);
+
+#if JSN_MODE
     TIMER_Interval(querySensor, NULL, QUERY_INTERVAL);
 #else
-    TIMER_Interval(demo, NULL, 500);
-#endif
-    
-    initGraphics();
-   
-    drawHline(50, 18, 128 - 50);
-    drawHline(50, 42, 128 - 50);
-    drawVline(48, 0, 64);    
-    drawBitmap(TANK_POS,(uint8_t*)tank, TANK_W, TANK_H);
-    
-    TEXT_Print(LINE1_TEXT_POS, "Disp.:");
-    TEXT_Print(LINE4_TEXT_POS, "Altura:");
-    TEXT_Print(LINE5_TEXT_POS, "Total:");
-
-    printCapacity(CAPACITY);
+    TIMER_Interval(demo, NULL, QUERY_INTERVAL);
 #endif
 
     while(1){
