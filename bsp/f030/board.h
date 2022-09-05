@@ -51,6 +51,9 @@
 #define GPIO_PU             (1 << 4)
 #define GPIO_PD             (2 << 4)
 #define GPIO_OD             (1 << 6)
+
+#define GPIO_LOW            0
+#define GPIO_HIGH           1
       
 /*--------------------------------------------------------------------*/
 
@@ -58,6 +61,8 @@
 #define LED_PORT            GPIOA
 #define LED_INIT            BOARD_GpioInit(LED_PORT, LED_PIN, GPO_LS)
 #define LED_TOGGLE          LED_PORT->ODR ^= (1 << LED_PIN)
+#define LED_ON              LED_PORT->BSRR = (1 << LED_PIN)
+#define LED_OFF             LED_PORT->BSRR = (0x10000 << LED_PIN)
 
 #define LCD_CK_Pin          5
 #define LCD_CK_Port         GPIOA
@@ -96,7 +101,8 @@ void BOARD_DelayMs(uint32_t ms);
 uint32_t BOARD_GetTicks(void);
 void BOARD_UartInit(uint32_t speed);
 void BOARD_UartTransmit(uint8_t *data, uint16_t count);
-void BOARD_UartReceiveDMA(uint8_t *data, uint16_t count, void(*eor)(void));
+void BOARD_UartReceiveDMA(uint8_t *data, uint16_t count, void(*eor)(uint32_t));
+void BOARD_MeasurePulse(uint8_t edge,  void(*eor)(uint32_t));
 
 #define DelayMs             BOARD_DelayMs
 #define getTicks            BOARD_GetTicks

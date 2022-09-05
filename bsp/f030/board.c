@@ -13,7 +13,9 @@ static const usartbauds_t bauds[] = {
 
 uint32_t SystemCoreClock = 8000000UL;
 static volatile uint32_t ticks = 0;
-static void (*usartEOR)(void);
+static void (*usartEOR)(uint32_t);
+static void (*timEOC)(uint32_t);
+uint16_t s_pulse;
 
 void error_handler(void){
 	while(1){
@@ -86,6 +88,7 @@ void BOARD_UartInit(uint32_t speed){
 void BOARD_Init(void){
 	SysTick_Config(SystemCoreClock / 1000);
 	RCC->AHBENR |= RCC_AHBENR_GPIOAEN | RCC_AHBENR_GPIOBEN | RCC_AHBENR_GPIOFEN;
+	RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
 	
 	LED_INIT;
 
@@ -96,7 +99,7 @@ void BOARD_Init(void){
 
 	#if JSN_MODE == JSN_MODE1
 	BOARD_GpioInit(BOARD_JSN_TRI_PORT, BOARD_JSN_TRI_PIN, GPO_LS);
-    BOARD_GpioInit(BOARD_JSN_ECHO_PORT, BOARD_JSN_ECHO_PIN, GPI);
+    BOARD_GpioInit(BOARD_JSN_ECHO_PORT, BOARD_JSN_ECHO_PIN, GPIO_AF2);
 	#else
 	BOARD_UartInit(JSN_SERIAL_SPEED);
 	#endif	
@@ -152,7 +155,8 @@ void BOARD_UartTransmit(uint8_t *data, uint16_t count){
 	USART1->TDR = *data;
 }
 
-void BOARD_UartReceiveDMA(uint8_t *data, uint16_t count, void(*eor)(void)){
+void BOARD_UartReceiveDMA(uint8_t *data, uint16_t count, void(*eor)(uint32_t)){
+	
 	DMA1_Channel3->CCR = 
 			//DMA_CCR_PL |        // Highest priority
             (0 << 10) |         // Memory size 8bit
@@ -171,6 +175,38 @@ void BOARD_UartReceiveDMA(uint8_t *data, uint16_t count, void(*eor)(void)){
 	NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
     DMA1_Channel3->CCR |= DMA_CCR_EN;
 }
+
+/**
+ * @brief Measures pulse duration in microseconds.
+ * Pulse must be applied on PA10 (TIM1_CH3)
+ * 
+ * @param edge 		- Pulse first edge
+ * @param eor 		- callback for completion
+ */
+void BOARD_MeasurePulse(uint8_t edge,  void(*eoc)(uint32_t)){
+	
+	TIM1->CR1 = 0;
+	TIM1->PSC = (SystemCoreClock/1000000UL) - 1;
+	TIM1->ARR = 0xFFFF;
+	TIM1->CNT = 0;
+
+	TIM1->CCMR2 = (1 << TIM_CCMR2_CC3S_Pos) | (2 << TIM_CCMR2_CC4S_Pos); // Map TI3 to CC3 and CC4
+
+	if(edge){
+		// Fist edge is rising
+		TIM1->CCER = TIM_CCER_CC4E | TIM_CCER_CC4P | TIM_CCER_CC3E;
+	}else{
+		// Second is falling
+		TIM1->CCER = TIM_CCER_CC4E | TIM_CCER_CC3E | TIM_CCER_CC3P;
+	}
+
+	timEOC = eoc;
+	s_pulse = 0xFFFF;
+
+	TIM1->DIER = TIM_DIER_CC4IE | TIM_DIER_CC3IE | TIM_DIER_UIE;
+	TIM1->CR1 |= TIM_CR1_CEN;
+	NVIC_EnableIRQ(TIM1_CC_IRQn);
+}
 /**
  * 
  * */
@@ -180,9 +216,19 @@ void SysTick_Handler(void){
 
 void DMA1_Channel2_3_IRQHandler(void){
 	if(DMA1->ISR & DMA_ISR_TCIF3){
-		usartEOR();
+		usartEOR(0);
 		DMA1_Channel3->CCR &= ~DMA_CCR_EN;
 	}
 
 	DMA1->IFCR |= DMA_IFCR_CGIF3;
+}
+
+void TIM1_CC_IRQHandler(void){
+	if(s_pulse == 0xFFFF){
+		s_pulse = TIM1->CCR3;
+	}else{
+		TIM1->CR1 = 0;
+		s_pulse = (uint16_t)TIM1->CCR4 - s_pulse;
+		timEOC(s_pulse);
+	}
 }
