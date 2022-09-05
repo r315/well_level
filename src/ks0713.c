@@ -168,3 +168,12 @@ uint16_t page = y >> 3;
 		}
 	}
 }
+
+void LCD_Clear(void){
+	for(uint8_t r = 0; r < LCD_H  / 8; r++){
+		LCD_setPos(0, r);
+		for(uint8_t c = 0; c < LCD_W; c++){
+			LCD_Data(0);
+		}
+	}
+}

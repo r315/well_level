@@ -109,4 +109,6 @@ void LCD_WriteBuf(uint8_t x, uint8_t y, uint8_t *buf, uint8_t cols, uint8_t rows
  *
  * */
 void LCD_PartialFrameBuffer(uint16_t x, uint16_t y, uint8_t *fbuf, uint16_t w, uint16_t h);
+
+void LCD_Clear(void);
 #endif
