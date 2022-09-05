@@ -15,6 +15,9 @@
 
 #define JSN_SERIAL_SPEED        9600
 
+#define JSN_MIN_DIST            200
+#define JSN_MAX_DIST            4000
+
 #define JSN_MODE1               1
 #define JSN_MODE2               2
 #define JSN_MODE3               3
