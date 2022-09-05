@@ -3,13 +3,13 @@
 
 #include <stdint.h>
 
-#define TANK_POS    0,0
-#define TANK_W      45
-#define TANK_H      64
-#define TANK_TOP    18      // y value for graphic
+#define TANK_POS        0,0
+#define TANK_W          45
+#define TANK_H          64
+#define TANK_TOP        18      // y value for graphic
 
 #define PERCENT_POS     104,0
-#define AVAILABLE_POS   93,1
+#define AVAILABLE_POS   55,1
 #define CAPACITY_POS    93,4
 #define LEVEL_LINE      3
 #define LEVEL_POS       103,LEVEL_LINE
@@ -21,10 +21,12 @@
 #define LINE3_TEXT_POS  50,2
 #define LINE4_TEXT_POS  50,3
 #define LINE5_TEXT_POS  50,4
-#define LINE6_TEXT_POS  80,5
-#define LINE7_TEXT_POS  80,6
-#define LINE8_TEXT_POS  80,7
+#define LINE6_TEXT_POS  50,5
+#define LINE7_TEXT_POS  50,6
+#define LINE8_TEXT_POS  50,7
 
+#define NO_COLOR        0
+#define FILLED          1
 
 extern const uint8_t tank[];
 extern const uint8_t alert[];
@@ -63,7 +65,7 @@ void printAlert(uint8_t visible);
 /**
  * @param distance : distance in mm from bottom to water level
  * */
-void printDistance(uint16_t distance);
+void printDistance(int32_t distance);
 
 /**
  * @param level : 0-100
@@ -73,12 +75,13 @@ void printPercent(uint8_t level);
 /**
  * @param avail : Liters
  * */
-void printAvalilable(uint32_t avail);
+void printAvalilable(uint32_t max, uint8_t level);
 
 /**
  * @param cap : Total capacity in liters
  * */
 void printCapacity(uint32_t cap);
+void printSensor(uint16_t data);
 
 void initGraphics(void);
 
